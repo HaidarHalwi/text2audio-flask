@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Pengubah Teks ke Audio</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<!-- Modal Loading -->
+<div id="loadingModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 hidden z-50">
+  <div class="bg-gray-100 rounded-lg shadow-md p-6 text-center">
+    <h2 class="text-xl font-semibold mb-4">Sedang diproses..</h2>
+    <svg class="mx-auto animate-spin h-12 w-12 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+    </svg>
+  </div>
+</div>
+
+<script>
+  // Fungsi ini aktif saat tombol submit ditekan
+  function showLoading() {
+    document.getElementById("loadingModal").classList.remove("hidden");
+  }
+
+  // Tambahkan event listener ke semua form
+  document.addEventListener("DOMContentLoaded", function () {
+    const forms = document.querySelectorAll("form");
+    forms.forEach(form => {
+      form.addEventListener("submit", function () {
+        showLoading();
+      });
+    });
+  });
+</script>
+
+<body class="bg-gray-50 text-gray-800 font-sans">
+  <div class="container mx-auto px-4">
+    <div class="max-w-2xl mx-auto bg-white p-6 rounded shadow-md z-10 relative">
+
+
+    <h1 class="text-2xl font-bold mb-4">Pengubah Teks Ke Audio</h1>
+
+    <!-- Upload EPUB & Proses Chunk -->
+    <form action="/" method="post" enctype="multipart/form-data" class="mb-6">
+      <input type="hidden" name="mode" value="epub">
+      <label class="block mb-2 font-semibold">Upload File EPUB</label>
+      <input type="file" name="epubfile" accept=".epub,.pdf,.docx,.xlsx,.xls,.txt"><br><br>
+      <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 w-full">Proses Chunk</button>
+    </form>
+
+    <!-- Upload Chunk Manual -->
+    <div class="mb-6">
+      <h2 class="text-lg font-semibold mb-2">Upload Chunk atau File Teks</h2>
+      <form method="post" enctype="multipart/form-data" action="/upload-chunk" class="flex flex-col gap-4 sm:gap-2">
+        <input type="file" name="chunkfile" accept=".txt"><br><br>
+        <select name="language" class="mb-2 p-2 border rounded w-full">
+          <option value="id">Indonesia</option>
+          <option value="ar">Arabic</option>
+          <option value="en">English</option>
+        </select>
+        <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 w-full">Proses Audio</button>
+      </form>
+    </div>
+
+    <!-- Ketik Manual -->
+    <div>
+      <h2 class="text-lg font-semibold mb-2">Ketik Manual</h2>
+      <form method="post" action="/manual-input">
+        <textarea name="manualtext" placeholder="Ketik teks manual..." rows="4" class="w-full p-2 border rounded mb-2"></textarea>
+        <select name="language" class="mb-2 p-2 border rounded w-full">
+          <option value="id">Indonesia</option>
+          <option value="ar">Arabic</option>
+          <option value="en">English</option>
+        </select>
+        <button type="submit" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 w-full">Proses Audio</button>
+      </form>
+    </div>
+
+    <!-- Tombol Reset -->
+    <form method="post" action="/reset">
+      <button type="submit" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 w-full mt-6">
+        Reset Semua
+      </button>
+    </form>
+
+    {% if mode == 'reset' %}
+    <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-4">
+      Semua data berhasil di-reset.
+    </div>
+    {% endif %}
+
+    <!-- Hasil Chunk -->
+    <!-- Hasil dari Proses EPUB -->
+     {% if chunk_files and mode == 'epub' %}
+      <div class="mb-6">
+        <br>
+        <a href="{{ url_for('download_all_chunks') }}" class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 block text-center mb-4">
+          Unduh Semua Chunk (ZIP)
+        </a>
+        <h2 class="text-lg font-semibold mb-2">Hasil Chunk dari File EPUB</h2>
+        {% for file in chunk_files %}
+        <div class="border p-2 rounded bg-gray-100 mb-2">
+          <a href="{{ url_for('uploaded_file', filename=file.split('/')[-1]) }}" download class="text-blue-600 hover:underline">
+            {{ file }}
+          </a>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+    {% if audio_files and mode == 'epub' %}
+    <div class="mb-6">
+      <h2 class="text-lg font-semibold mb-2">Hasil dari EPUB (Audio)</h2>
+      {% for file in audio_files %}
+      <div class="border p-3 rounded bg-gray-100 mb-2">
+        <p>{{ file }}</p>
+        <audio controls class="w-full" id="audio-{{ loop.index }}">
+          <source src="{{ url_for('static', filename=file) }}" type="audio/mpeg">
+          Browser tidak mendukung audio.
+        </audio>
+
+        <div class="flex items-center space-x-2 mt-1 text-sm">
+          <label for="speed-{{ loop.index }}">Kecepatan: </label>
+          <input type="range" id="speed-{{ loop.index }}" min="0.5" max="2" value="1" step="0.1" class="w-40"
+                onchange="document.getElementById('audio-{{ loop.index }}').playbackRate = this.valueAsNumber">
+          <span id="speed-value-{{ loop.index }}">1x</span>
+        </div>
+      </div>
+      {% endfor %}
+      <p class="text-sm text-gray-600">Akurasi model: <strong>{{ accuracy * 100 }}%</strong></p>
+      <p class="text-sm text-gray-600">Akurasi model (ROUGE-1): <strong>{{ accuracy * 100 }}%</strong></p>
+      <p class="text-sm text-gray-600">Jumlah waktu: <strong>{{ duration }}</strong></p>
+
+    </div>
+    {% endif %}
+
+    <!-- Hasil dari Upload Chunk -->
+    {% if audio_files and mode == 'chunk' %}
+    <div class="mb-6">
+      <h2 class="text-lg font-semibold mb-2">Hasil dari File Chunk (Audio)</h2>
+      {% for file in audio_files %}
+      <div class="border p-3 rounded bg-gray-100 mb-2">
+        <p>{{ file }}</p>
+      <audio controls class="w-full" id="audio-{{ loop.index }}">
+        <source src="{{ url_for('static', filename=file) }}" type="audio/mpeg">
+        Browser tidak mendukung audio.
+      </audio>
+
+      <div class="flex items-center space-x-2 mt-1 text-sm">
+        <label for="speed-{{ loop.index }}">Kecepatan: </label>
+        <input type="range" id="speed-{{ loop.index }}" min="0.5" max="2" value="1" step="0.1" class="w-40"
+              onchange="document.getElementById('audio-{{ loop.index }}').playbackRate = this.valueAsNumber">
+        <span id="speed-value-{{ loop.index }}">1x</span>
+      </div>
+      </div>
+      {% endfor %}
+      <p class="text-sm text-gray-600">Akurasi model: <strong>{{ accuracy * 100 }}%</strong></p>
+      <p class="text-sm text-gray-600">Akurasi model (ROUGE-1): <strong>{{ accuracy * 100 }}%</strong></p>
+      <p class="text-sm text-gray-600">Jumlah waktu: <strong>{{ duration }}</strong></p>
+    </div>
+    {% endif %}
+
+    <!-- Hasil dari Manual Input -->
+    {% if audio_files and mode == 'manual' %}
+    <div class="mb-6">
+      <h2 class="text-lg font-semibold mb-2">Hasil dari Input Manual (Audio)</h2>
+      {% for file in audio_files %}
+      <div class="border p-3 rounded bg-gray-100 mb-2">
+        <p>{{ file }}</p>
+        <audio controls class="w-full" id="audio-{{ loop.index }}">
+          <source src="{{ url_for('static', filename=file) }}" type="audio/mpeg">
+          Browser tidak mendukung audio.
+        </audio>
+      
+        {% if rouge_logs and rouge_logs|length > 0 %}
+        <p class="text-sm text-gray-600 mt-4">
+          Akurasi terakhir: <strong>{{ rouge_logs[-1].accuracy }}</strong> |
+          ROUGE-1: <strong>{{ rouge_logs[-1].score }}</strong> |
+          Waktu: <strong>{{ rouge_logs[-1].duration }}</strong>
+        </p>
+        {% else %}
+        <p class="text-sm text-gray-600 mt-4 text-red-600">
+          Belum ada evaluasi ROUGE tersedia.
+        </p>
+        {% endif %}
+
+
+
+        <div class="flex items-center space-x-2 mt-1 text-sm">
+          <label for="speed-{{ loop.index }}">Kecepatan: </label>
+          <input type="range" id="speed-{{ loop.index }}" min="0.5" max="2" value="1" step="0.1" class="w-40"
+                onchange="document.getElementById('audio-{{ loop.index }}').playbackRate = this.valueAsNumber">
+          <span id="speed-value-{{ loop.index }}">1x</span>
+        </div>
+
+      </div>
+      {% endfor %}
+      <p class="text-sm text-gray-600">Akurasi model: <strong>{{ accuracy * 100 }}%</strong></p>
+      <p class="text-sm text-gray-600">Akurasi model (ROUGE-1): <strong>{{ accuracy * 100 }}%</strong></p>
+      <p class="text-sm text-gray-600">Jumlah waktu: <strong>{{ duration }}</strong></p>
+    </div>
+    {% endif %}
+
+    {% if audio_files %}
+      <div class="bg-green-100 text-green-800 p-2 rounded mb-2">
+        Proses berhasil. {{ audio_files|length }} audio berhasil dibuat.
+      </div>
+    {% endif %}
+  </div>
+  {% if rouge_logs %}
+  <div class="mt-6">
+    <h2 class="text-lg font-semibold mb-2">Log Evaluasi ROUGE</h2>
+    <div class="overflow-x-auto">
+      {% if not rouge_logs %}
+        <p class="text-red-600">Belum ada data evaluasi ROUGE. Upload file EPUB dulu untuk membandingkan hasilnya.</p>
+      {% else %}
+        <table class="table-auto border-collapse w-full text-sm">
+          <thead>
+            <tr class="bg-gray-200">
+              <th class="border px-4 py-2">Reference (Potongan)</th>
+              <th class="border px-4 py-2">Generated (Potongan)</th>
+              <th class="border px-4 py-2">ROUGE-1 F1 Score</th>
+              <th class="border px-4 py-2">Akurasi Model</th>
+              <th class="border px-4 py-2">Jumlah Waktu</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rouge_logs %}
+            <tr>
+              <td class="border px-4 py-2">{{ row.reference[:150] }}{% if row.reference|length > 150 %}...{% endif %}</td>
+              <td class="border px-4 py-2">{{ row.generated[:150] }}{% if row.generated|length > 150 %}...{% endif %}</td>
+              <td class="border px-4 py-2 text-center">{{ row.score }}</td>
+              <td class="border px-4 py-2 text-center">{{ row.accuracy }}</td>
+              <td class="border px-4 py-2 text-center">{{ row.duration }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <br><br>
+        <center>
+          <a href="{{ url_for('download_rouge_log') }}" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+            Download ROUGE Log (.csv)
+          </a>
+        </center>
+      {% endif %}
+    </div>
+  </div>
+{% endif %}
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll('[id^="speed-"]').forEach(slider => {
+      const index = slider.id.split('-')[1];
+      const valueDisplay = document.getElementById('speed-value-' + index);
+      const audio = document.getElementById('audio-' + index);
+      slider.addEventListener('input', function () {
+        if (valueDisplay) valueDisplay.innerText = this.value + 'x';
+        if (audio) audio.playbackRate = this.valueAsNumber;
+      });
+    });
+  });
+</script>
+
+
+</body>
+</html>
